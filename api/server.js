@@ -1,10 +1,9 @@
 import express from "express";
 import axios from "axios";
-import dotenv from "dotenv";
+import "./loadEnv.js";
 import { router } from "../routes/webhook.js";
 
-dotenv.config();
-
+const WPP_MY_NUMBER_ID = process.env.WPP_MY_NUMBER_ID;
 const app = express();
 app.use(express.json());
 
@@ -13,6 +12,7 @@ app.use("/webhook", router);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Server Listening on PORT:", PORT);
+  console.log("WhatsApp Number ID:", WPP_MY_NUMBER_ID);
 });
 
 app.get("/status", (request, response) => {
@@ -24,20 +24,21 @@ app.get("/status", (request, response) => {
 
 app.post("/message", (request, response) => {
   const { message } = request.body;
-  const url = "https://graph.facebook.com/v17.0/606534115881714/messages";
-  //console.log("Mensagem recebida:", message);
-  const data = request.body;
 
+  const url = `https://graph.facebook.com/${process.env.WPP_VERSION}/${process.env.WPP_MY_NUMBER_ID}/messages`;
+
+  const data = request.body;
+  console.log(data);
   const config = {
     headers: {
       Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
       "Content-Type": "application/json",
     },
   };
+
   axios
     .post(url, data, config)
     .then((res) => {
-      console.log("Mensagem enviada com sucesso:", res.data);
       response.send(res.data);
     })
     .catch((error) => {
