@@ -13,4 +13,4 @@ COPY . .
 EXPOSE 3000
 
 # Comando para rodar
-CMD ["node", "server.js"]
+CMD ["node", "api/server.js"]

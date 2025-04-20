@@ -53,7 +53,7 @@ app.get("/messagesDB/:number", async (request, response) => {
   //msgSent "to": "5518998200826"
   const received = await db
     .collection("Received_Messages")
-    .find({ "entry.changes.value.statuses.recipient_id": number })
+    .find({ "entry.changes.value.messages.from": number })
     .toArray()
     .catch((error) => {
       console.error("Erro ao buscar mensagem:", error);
