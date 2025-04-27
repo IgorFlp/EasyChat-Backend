@@ -3,10 +3,12 @@ import axios from "axios";
 import "./loadEnv.js";
 import { router } from "../routes/webhook.js";
 import { db } from "./connect.js";
+import cors from "cors";
 
 const WPP_MY_NUMBER_ID = process.env.WPP_MY_NUMBER_ID;
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 app.use("/webhook", router);
@@ -78,6 +80,7 @@ app.post("/messageDB/:mode", async (request, response) => {
   const { mode } = request.params;
   if (mode == "sent") {
     const message = request.body;
+    message.mode = "sent";
     console.log(message);
     const sent = await db
       .collection("Sent_Messages")
@@ -94,6 +97,7 @@ app.post("/messageDB/:mode", async (request, response) => {
   }
   if (mode == "received") {
     const message = request.body;
+    message.mode = "received";
     console.log(message);
     const sent = await db
       .collection("Received_Messages")
@@ -110,9 +114,7 @@ app.post("/messageDB/:mode", async (request, response) => {
   }
 });
 
-app.post("/message", (request, response) => {
-  const { message } = request.body;
-
+app.post("/message", async (request, response) => {
   const url = `https://graph.facebook.com/${process.env.WPP_VERSION}/${process.env.WPP_MY_NUMBER_ID}/messages`;
 
   const data = request.body;
@@ -126,7 +128,16 @@ app.post("/message", (request, response) => {
 
   axios
     .post(url, data, config)
-    .then((res) => {
+    .then(async (res) => {
+      data.mode = "sent";
+      console.log(data);
+      const sent = await db
+        .collection("Sent_Messages")
+        .insertOne(data)
+        .catch((error) => {
+          console.error("Erro ao inserir mensagem:", error);
+          response.status(500).send("Erro ao inserir mensagem");
+        });
       response.send(res.data);
     })
     .catch((error) => {
