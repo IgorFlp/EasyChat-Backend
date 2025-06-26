@@ -1,5 +1,6 @@
 import express from "express";
 import axios from "axios";
+
 //import { GetMessages } from "./mensagensDAO.js";
 import { getConnection } from "./connect.js";
 import "./loadEnv.js";
@@ -26,6 +27,7 @@ app.get("/status", (request, response) => {
   };
   response.send(status);
 });
+
 
 app.get("/messagesDB", async (request, response) => {
   let client = await getConnection();
@@ -98,12 +100,15 @@ app.post("/message", async (request, response) => {
 
   const data = request.body;
   console.log(data);
+
+
   const config = {
     headers: {
       Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
       "Content-Type": "application/json",
     },
   };
+
 
   axios
     .post(url, data, config)
@@ -117,6 +122,7 @@ app.post("/message", async (request, response) => {
           console.error("Erro ao inserir mensagem:", error);
           response.status(500).send("Erro ao inserir mensagem");
         });
+
       response.send(res.data);
     })
     .catch((error) => {
