@@ -14,6 +14,24 @@ app.use(express.json());
 app.use(cors());
 
 const PORT = process.env.PORT || 3000;
+async function InsertMessage(formatedMessage) {
+  let client = await getConnection();
+  const res = await client`INSERT INTO ${client(SCHEMA)}.mensagens
+    (id, recipient, sender, "mode", "type", text, arquivo_url, "timestamp", metadados, "source")
+    VALUES(${formatedMessage.id}, ${formatedMessage.recipient}, ${
+    formatedMessage.sender
+  }, ${formatedMessage.mode}, ${formatedMessage.type}, ${
+    formatedMessage.text
+  }, ${formatedMessage.arquivo_url}, ${formatedMessage.timestamp}, ${
+    formatedMessage.metadados
+  }, ${formatedMessage.source});`;
+
+  if (!res) {
+    return "Mensagem não encontrada";
+  } else {
+    return 200;
+  }
+}
 app.use("/webhook", router);
 
 app.listen(PORT, "0.0.0.0", async () => {
@@ -27,7 +45,6 @@ app.get("/status", (request, response) => {
   };
   response.send(status);
 });
-
 
 app.get("/messagesDB", async (request, response) => {
   let client = await getConnection();
@@ -52,19 +69,14 @@ app.get("/messagesDB/:contact", async (request, response) => {
   response.send(messages);
 });
 
-app.post("/messageDB/:mode", async (request, response) => {
-  const { mode } = request.params;
+app.post("/LogIncomingMessage", async (request, response) => {
   const message = request.body;
-  let recepient = mode === "received" ? process.env.WPP_MY_NUMBER : message.to;
-  console.log(
-    "Received Message:",
-    message.entry[0].changes[0].value.messages[0]
-  );
+
   let formatedMessage = {};
   if (message.entry[0]) {
     formatedMessage = {
       id: message.entry[0].id,
-      recipient: recepient,
+      recipient: process.env.WPP_MY_NUMBER,
       sender: message.entry[0].changes[0].value.messages[0].from,
       mode: mode,
       type: message.entry[0].changes[0].value.messages[0].type,
@@ -76,7 +88,8 @@ app.post("/messageDB/:mode", async (request, response) => {
     };
   }
   console.log("Formated Message:", formatedMessage);
-
+  InsertMessage(formatedMessage);
+  /*
   let client = await getConnection();
   const res = await client`INSERT INTO ${client(SCHEMA)}.mensagens
     (id, recipient, sender, "mode", "type", text, arquivo_url, "timestamp", metadados, "source")
@@ -87,12 +100,13 @@ app.post("/messageDB/:mode", async (request, response) => {
   }, ${formatedMessage.arquivo_url}, ${formatedMessage.timestamp}, ${
     formatedMessage.metadados
   }, ${formatedMessage.source});`;
-
+  
   if (!res) {
     response.status(404).send("Mensagem não encontrada");
   } else {
     response.status(200).send(sent);
   }
+    */
 });
 
 app.post("/message", async (request, response) => {
@@ -101,7 +115,6 @@ app.post("/message", async (request, response) => {
   const data = request.body;
   console.log(data);
 
-
   const config = {
     headers: {
       Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
@@ -109,19 +122,30 @@ app.post("/message", async (request, response) => {
     },
   };
 
-
   axios
     .post(url, data, config)
     .then(async (res) => {
-      data.mode = "sent";
-      console.log(data);
-      const sent = await db
-        .collection("Sent_Messages")
-        .insertOne(data)
-        .catch((error) => {
-          console.error("Erro ao inserir mensagem:", error);
-          response.status(500).send("Erro ao inserir mensagem");
-        });
+      let mode = "sent";
+      let formatedMessage = {};
+      try {
+        formatedMessage = {
+          id: res.data.messages[0].id,
+          recipient: data.to,
+          sender: process.env.WPP_MY_NUMBER,
+          mode: mode,
+          type: data.type,
+          text: data.text.body,
+          arquivo_url: "",
+          timestamp: Date.now(),
+          metadados: "",
+          source: res.data.messaging_product,
+        };
+        InsertMessage(formatedMessage);
+      } catch (error) {
+        console.error("Erro no log de informações:", error);
+        response.status(500).send("Erro no log de informações");
+        return;
+      }
 
       response.send(res.data);
     })
