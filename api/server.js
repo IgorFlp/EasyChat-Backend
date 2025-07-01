@@ -75,10 +75,10 @@ app.post("/LogIncomingMessage", async (request, response) => {
   let formatedMessage = {};
   if (message.entry[0]) {
     formatedMessage = {
-      id: message.entry[0].id,
+      id: message.entry[0].changes[0].value.messages[0].id,
       recipient: process.env.WPP_MY_NUMBER,
       sender: message.entry[0].changes[0].value.messages[0].from,
-      mode: mode,
+      mode: "received",
       type: message.entry[0].changes[0].value.messages[0].type,
       text: message.entry[0].changes[0].value.messages[0].text.body,
       arquivo_url: "",
@@ -88,7 +88,7 @@ app.post("/LogIncomingMessage", async (request, response) => {
     };
   }
   console.log("Formated Message:", formatedMessage);
-  InsertMessage(formatedMessage);
+  let res = await InsertMessage(formatedMessage);
   /*
   let client = await getConnection();
   const res = await client`INSERT INTO ${client(SCHEMA)}.mensagens
@@ -100,13 +100,12 @@ app.post("/LogIncomingMessage", async (request, response) => {
   }, ${formatedMessage.arquivo_url}, ${formatedMessage.timestamp}, ${
     formatedMessage.metadados
   }, ${formatedMessage.source});`;
-  
+  */
   if (!res) {
     response.status(404).send("Mensagem não encontrada");
   } else {
-    response.status(200).send(sent);
+    response.status(200).send("Mensagem recebida e registrada com sucesso");
   }
-    */
 });
 
 app.post("/message", async (request, response) => {
