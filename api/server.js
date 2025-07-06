@@ -1,7 +1,6 @@
 import express from "express";
 import axios from "axios";
-
-//import { GetMessages } from "./mensagensDAO.js";
+import { httpServer, io, app } from "./socket.js";
 import { getConnection } from "./connect.js";
 import "./loadEnv.js";
 import { router } from "../routes/webhook.js";
@@ -9,7 +8,7 @@ import cors from "cors";
 
 const SCHEMA = "EasyChat";
 const WPP_MY_NUMBER_ID = process.env.WPP_MY_NUMBER_ID;
-const app = express();
+//const app = express();
 app.use(express.json());
 app.use(cors());
 
@@ -33,10 +32,17 @@ async function InsertMessage(formatedMessage) {
   }
 }
 app.use("/webhook", router);
-
+/*
 app.listen(PORT, "0.0.0.0", async () => {
   console.log("Server Listening on PORT:", PORT);
   console.log("WhatsApp Number ID:", WPP_MY_NUMBER_ID);
+});*/
+io.on("connection", (socket) => {
+  console.log("Socket conectado (do server.js também):", socket.id);
+});
+
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log("Servidor com WebSocket rodando na porta:", PORT);
 });
 
 app.get("/status", (request, response) => {
@@ -96,8 +102,10 @@ app.post("/LogIncomingMessage", async (request, response) => {
       source: message.entry[0].changes[0].value.messaging_product,
     };
   }
+
   console.log("Formated Message:", formatedMessage);
   let res = await InsertMessage(formatedMessage);
+  io.emit("new_message", formatedMessage);
   if (!res) {
     response.status(404).send("Mensagem não encontrada");
   } else {
