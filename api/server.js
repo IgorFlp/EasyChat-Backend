@@ -51,6 +51,15 @@ app.get("/messagesDB", async (request, response) => {
   const messages = await client`SELECT * FROM ${client(SCHEMA)}.mensagens;`;
   response.send(messages);
 });
+app.get("/contacts", async (request, response) => {
+  let client = await getConnection();
+  const contacts = await client`SELECT * FROM ${client(SCHEMA)}.contatos;`;
+  if (contacts.length === 0) {
+    response.status(204).send("Nenhum contato encontrado.");
+    return;
+  }
+  response.status(200).send(contacts);
+});
 
 app.get("/messagesDB/:contact", async (request, response) => {
   const { contact } = request.params;
@@ -83,24 +92,12 @@ app.post("/LogIncomingMessage", async (request, response) => {
       text: message.entry[0].changes[0].value.messages[0].text.body,
       arquivo_url: "",
       timestamp: message.entry[0].changes[0].value.messages[0].timestamp,
-      metadados: message.entry[0].changes[0].value.metadata,
+      metadados: JSON.stringify(message.entry[0].changes[0].value.metadata),
       source: message.entry[0].changes[0].value.messaging_product,
     };
   }
   console.log("Formated Message:", formatedMessage);
   let res = await InsertMessage(formatedMessage);
-  /*
-  let client = await getConnection();
-  const res = await client`INSERT INTO ${client(SCHEMA)}.mensagens
-    (id, recipient, sender, "mode", "type", text, arquivo_url, "timestamp", metadados, "source")
-    VALUES(${formatedMessage.id}, ${formatedMessage.recipient}, ${
-    formatedMessage.sender
-  }, ${formatedMessage.mode}, ${formatedMessage.type}, ${
-    formatedMessage.text
-  }, ${formatedMessage.arquivo_url}, ${formatedMessage.timestamp}, ${
-    formatedMessage.metadados
-  }, ${formatedMessage.source});`;
-  */
   if (!res) {
     response.status(404).send("Mensagem não encontrada");
   } else {
@@ -145,8 +142,7 @@ app.post("/message", async (request, response) => {
         response.status(500).send("Erro no log de informações");
         return;
       }
-
-      response.send(res.data);
+      response.send(formatedMessage);
     })
     .catch((error) => {
       console.error(
