@@ -2,12 +2,13 @@
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import "./loadEnv.js";
 
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173", // ajuste em produção
+    origin: process.env.CORS_ORIGIN, // ajuste em produção
   },
 });
 
