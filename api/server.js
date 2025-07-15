@@ -5,10 +5,22 @@ import { getConnection } from "./connect.js";
 import "./loadEnv.js";
 import { router } from "../routes/webhook.js";
 import cors from "cors";
+import jwt from "jsonwebtoken";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const cookieParser = require("cookie-parser");
+const allowedDomain = process.env.CORS_ORIGIN.replace(/^https?:\/\//, "");
+const AUTH_SECRET = process.env.AUTH_SECRET;
+const CORS_ORIGIN = process.env.CORS_ORIGIN;
+
+//const app = express();
+
 
 const SCHEMA = "EasyChat";
 const WPP_MY_NUMBER_ID = process.env.WPP_MY_NUMBER_ID;
 //const app = express();
+app.use(cookieParser());
 app.use(express.json());
 app.use(cors());
 
@@ -44,7 +56,99 @@ io.on("connection", (socket) => {
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log("Servidor com WebSocket rodando na porta:", PORT);
 });
+// AUTH METHODS
+function authenticateJWT(req, res, next) {  
+  const token = req.cookies.token || req.headers.authorization?.split(" ")[1];  
+  if (!token) return res.sendStatus(401);
+  jwt.verify(token, AUTH_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+}
 
+app.get("/me", authenticateJWT, (req, res) => {
+  res.json({ userName: req.user.userName });
+});
+app.post("/register", async (req, res) => {
+  console.log("Req: "+JSON.stringify(req.body))
+  const { user, password } = req.body;  
+  const client = await getConnection();
+
+  const find = await client`SELECT * FROM ${client(SCHEMA)}.users WHERE userName = ${user}`
+  
+  if (find != null) {
+    res
+      .status(409)
+      .json({ message: "Nome de usuario existente, favor escolher outro." });
+  } else {
+    const newUser = {
+      username: user,
+      password: password,
+      dataBases: []
+    };
+    
+    const response = await client`INSERT INTO ${client(
+    SCHEMA
+  )}.users (username,password,databases) VALUES (${newUser.username,newUser.password,newUser.dataBases}) RETURNING id;;`
+    console.log("response: " + response.insertedId);
+    //const userId = response.insertedId;
+
+    if (response) {
+      res.status(200).json({ message: "Usuario criado" });
+    } else {
+      res.status(401).send("Invalid credentials");
+    }
+  }
+});
+app.post("/login", async (req, res) => {
+  const { user, password } = req.body;
+  console.log("User: " + user);  
+  let client = await getConnection();  
+  let response = await client`SELECT * FROM ${client(
+    SCHEMA
+  )}.users WHERE userName = ${user} AND password = ${password};`;
+  if (response.length === 0) {
+    response
+      .status(404)
+      .send("Usuario ou senha incorreto..");
+    return;
+  }
+
+  if (response) {
+    const userId = response.id;
+    const userName = response.userName;
+    const token = jwt.sign({ userId: userId, userName: userName }, AUTH_SECRET, {
+      expiresIn: "2h",
+    });
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 2 * 60 * 60 * 1000, // 2 hours in milliseconds
+      path: "/",
+    });
+
+    res.json({ userName: userName });
+  } else {
+    res.status(401).send("Invalid credentials");
+  }
+});
+app.post("/logout", (req, res) => {
+  
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.COOKIE_SAME_SITE,
+    path: "/",
+    domain: allowedDomain,
+  });
+
+  res.status(200).json({ message: "Logout realizado com sucesso" });
+});
+
+// EASYCHAT METHODS
 app.get("/status", (request, response) => {
   const status = {
     Status: "Running",

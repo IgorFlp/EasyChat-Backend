@@ -8,12 +8,14 @@ const PUBLIC = "public";
 const SCHEMA = "EasyChat";
 
 export async function getConnection() {
+  
   const clusterEndpoint = process.env.CLUSTER_ENDPOINT;
   assert(clusterEndpoint);
   const user = process.env.CLUSTER_USER;
   assert(user);
   const region = process.env.CLUSTER_REGION;
   assert(region);
+
   let client = postgres({
     host: clusterEndpoint,
     user: user,
