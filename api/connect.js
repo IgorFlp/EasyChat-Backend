@@ -19,8 +19,6 @@ export async function getConnection() {
   let client = postgres({
     host: clusterEndpoint,
     user: user,
-    // We can pass a function to password instead of a value, which will be triggered whenever
-    // connections are opened.
     password: async () => await getPasswordToken(clusterEndpoint, user, region),
     database: "postgres",
     port: 5432,

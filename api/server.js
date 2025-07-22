@@ -10,7 +10,7 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 const cookieParser = require("cookie-parser");
-const allowedDomain = process.env.CORS_ORIGIN.replace(/^https?:\/\//, "");
+const allowedDomain = process.env.CORS_ORIGIN //.replace(/^https?:\/\//, "");
 const AUTH_SECRET = process.env.AUTH_SECRET;
 const CORS_ORIGIN = process.env.CORS_ORIGIN;
 
@@ -22,7 +22,12 @@ const WPP_MY_NUMBER_ID = process.env.WPP_MY_NUMBER_ID;
 //const app = express();
 app.use(cookieParser());
 app.use(express.json());
-app.use(cors());
+app.use(cors(
+  {
+  origin: process.env.CORS_ORIGIN,
+  credentials: true
+}
+));
 
 const PORT = process.env.PORT || 3000;
 async function InsertMessage(formatedMessage) {
@@ -76,25 +81,25 @@ app.post("/register", async (req, res) => {
   const client = await getConnection();
 
   const find = await client`SELECT * FROM ${client(SCHEMA)}.users WHERE userName = ${user}`
-  
-  if (find != null) {
+  console.log(find)
+  if (find.length > 0) {
     res
       .status(409)
       .json({ message: "Nome de usuario existente, favor escolher outro." });
   } else {
     const newUser = {
+      id: 0,
       username: user,
-      password: password,
-      dataBases: []
+      password: password,      
     };
     
     const response = await client`INSERT INTO ${client(
     SCHEMA
-  )}.users (username,password,databases) VALUES (${newUser.username,newUser.password,newUser.dataBases}) RETURNING id;;`
-    console.log("response: " + response.insertedId);
+  )}.users (username,password) VALUES (${newUser.username}, ${newUser.password}) RETURNING id;`
+    console.log("response: " + response[0].id);
     //const userId = response.insertedId;
 
-    if (response) {
+    if (response[0].id) {
       res.status(200).json({ message: "Usuario criado" });
     } else {
       res.status(401).send("Invalid credentials");
@@ -103,7 +108,7 @@ app.post("/register", async (req, res) => {
 });
 app.post("/login", async (req, res) => {
   const { user, password } = req.body;
-  console.log("User: " + user);  
+  //console.log("User: " + user);  
   let client = await getConnection();  
   let response = await client`SELECT * FROM ${client(
     SCHEMA
@@ -137,13 +142,16 @@ app.post("/login", async (req, res) => {
 });
 app.post("/logout", (req, res) => {
   
+  const isProduction = process.env.NODE_ENV === "production";
+
   res.clearCookie("token", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.COOKIE_SAME_SITE,
+    secure: isProduction,
+    sameSite: isProduction ? "None" : "Lax",
     path: "/",
-    domain: allowedDomain,
+    ...(isProduction && { domain: ".igorflpdev.online" })
   });
+  
 
   res.status(200).json({ message: "Logout realizado com sucesso" });
 });
