@@ -11,14 +11,15 @@
   "description": "",
   "type": "module",
   "dependencies": {
-
     "@aws-sdk/dsql-signer": "^3.835.0",
     "axios": "^1.8.4",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.15.0",
-    "postgres": "^3.4.7"
-
+    "postgres": "^3.4.7",
+    "socket.io": "^4.8.1"
   }
 }
