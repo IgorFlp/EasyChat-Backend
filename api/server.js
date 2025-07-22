@@ -13,7 +13,7 @@ const cookieParser = require("cookie-parser");
 const allowedDomain = process.env.CORS_ORIGIN //.replace(/^https?:\/\//, "");
 const AUTH_SECRET = process.env.AUTH_SECRET;
 const CORS_ORIGIN = process.env.CORS_ORIGIN;
-
+const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
 //const app = express();
 
 
@@ -130,9 +130,10 @@ app.post("/login", async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 2 * 60 * 60 * 1000, // 2 hours in milliseconds
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      maxAge: 2 * 60 * 60 * 1000,
       path: "/",
+      ...(process.env.NODE_ENV === "production" && { domain: COOKIE_DOMAIN })
     });
 
     res.json({ userName: userName });
@@ -149,7 +150,7 @@ app.post("/logout", (req, res) => {
     secure: isProduction,
     sameSite: isProduction ? "None" : "Lax",
     path: "/",
-    ...(isProduction && { domain: ".igorflpdev.online" })
+    ...(isProduction && { domain: COOKIE_DOMAIN })
   });
   
 
