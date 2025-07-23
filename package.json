@@ -19,6 +19,8 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.15.0",
+    "pg": "^8.16.3",
+    "pool": "^0.4.1",
     "postgres": "^3.4.7",
     "socket.io": "^4.8.1"
   }
