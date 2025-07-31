@@ -74,8 +74,9 @@ function authenticateJWT(req, res, next) {
 }
 async function GetUserDatabase(userId) {
   //console.log("Userid: "+userId)
+  let client;
   try {
-    let client = await getConnection();
+    client = await getConnection();
     const response = await client.query(`SELECT 
           ud.database_id,
           d.name
@@ -148,8 +149,9 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
   try {
     const { user, password } = req.body;
-    //console.log("User: " + user);
+    console.log(req.body);
     let client = await getConnection();
+    //console.log("User: " + user);
     let response = await client.query(
       `SELECT * FROM "${MANAGEMENT_SCHEMA}".users WHERE username = '${user}' AND password = '${password}';`
     );
@@ -184,8 +186,6 @@ app.post("/login", async (req, res) => {
     }
   } catch (e) {
     res.status(404).send("Erro inexperado no login: " + e.message);
-  } finally {
-    await client.end();
   }
 });
 app.post("/logout", (req, res) => {
@@ -212,9 +212,10 @@ app.get("/status", (request, response) => {
 app.get("/user_databases", authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.userId;
-    let databases = GetUserDatabase(userId);
+    let databases = await GetUserDatabase(userId);
+    console.log(databases);
     if (databases.length > 0) {
-      res.status(200).send(response.rows);
+      res.status(200).send(databases);
     } else {
       res.status(404).send("Nenhum banco de dados para este usuario.");
     }
@@ -222,8 +223,6 @@ app.get("/user_databases", authenticateJWT, async (req, res) => {
     res
       .status(404)
       .send("Erro inesperado em get users_databases: " + e.message);
-  } finally {
-    await client.end();
   }
 });
 
@@ -248,20 +247,21 @@ app.get("/messagesDB", authenticateJWT, async (request, response) => {
     if (messages.rows.length > 0) {
       response.status(200).send(messages.rows);
     } else {
-      response.status(404).send("Nenhuma mensagem encontrada");
+      response.status(204).send("Nenhuma mensagem encontrada");
     }
   } catch (e) {
-    res.status(404).send("Erro inesperado em get messagesDB: " + e.message);
-  } finally {
-    await client.end();
+    response
+      .status(404)
+      .send("Erro inesperado em get messagesDB: " + e.message);
   }
 });
 app.get("/contacts", authenticateJWT, async (request, response) => {
+  let client;
   try {
     let database = request.query.database;
     let userId = request.user.userId;
     let contacts = [];
-    let client = await getConnection();
+    client = await getConnection();
     let IsUserAuthorized = await DatabaseAuth(userId, database);
     console.log("authorized: " + IsUserAuthorized);
     if (IsUserAuthorized) {
