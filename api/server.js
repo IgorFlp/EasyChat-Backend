@@ -7,6 +7,7 @@ import { router } from "../routes/webhook.js";
 import cors from "cors";
 import jwt from "jsonwebtoken";
 import { createRequire } from "module";
+import e from "express";
 
 const require = createRequire(import.meta.url);
 const cookieParser = require("cookie-parser");
@@ -30,19 +31,59 @@ app.use(
 
 const PORT = process.env.PORT || 3000;
 async function InsertMessage(formatedMessage, database) {
+  //console.log("Formated Message to insert:", JSON.stringify(formatedMessage));
+  let client;
+  let res;
   try {
-    let client = await getConnection();
-    const res = await client.query(`INSERT INTO "EC-${database}".mensagens
-    (id, recipient, sender, "mode", "type", text, arquivo_url, "timestamp", metadados, "source")
-    VALUES(${formatedMessage.id}, ${formatedMessage.recipient}, ${formatedMessage.sender}, ${formatedMessage.mode}, ${formatedMessage.type}, ${formatedMessage.text}, ${formatedMessage.arquivo_url}, ${formatedMessage.timestamp}, ${formatedMessage.metadados}, ${formatedMessage.source});`);
-
-    if (!res) {
+    client = await getConnection();
+    let coluna;
+    switch (formatedMessage.source) {
+      case "whatsapp":
+        coluna = "whatsapp_id";
+        break;
+      case "telegram":
+        coluna = "telegram_id";
+        break;
+      case "instagram":
+        coluna = "instagram_id";
+        break;
+    }
+    let contact_id;
+    const query1 = `SELECT * FROM "EC-${database}".contatos WHERE ${coluna} = '${formatedMessage.common_id}'`;
+    let res1 = await client.query(query1);
+    if (res1.rows.length > 0) {
+      contact_id = res1.rows[0].id;
+    } else {
+      contact_id = null;
+    }
+    const values = [
+      formatedMessage.id,
+      formatedMessage.recipient,
+      formatedMessage.sender,
+      formatedMessage.mode,
+      formatedMessage.type,
+      formatedMessage.text || null,
+      formatedMessage.arquivo_url || null,
+      formatedMessage.timestamp,
+      formatedMessage.metadados || null,
+      formatedMessage.source,
+      formatedMessage.common_id || null,
+      formatedMessage.contact_id || contact_id,
+    ];
+    const query2 = `
+      INSERT INTO "EC-${database}".mensagens
+      (id, recipient, sender, "mode", "type", text, arquivo_url, "timestamp", metadados, "source", common_id,contact_id)
+      VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11,$12)
+    `;
+    let res2 = await client.query(query2, values);
+    console.log("Insert message response: " + JSON.stringify(res2));
+    if (!res2) {
       return "Mensagem não inserida";
     } else {
       return 200;
     }
   } catch (e) {
-    res.status(404).send("Erro inesperado em insert message: " + e.message);
+    return "Erro ao inserir mensagem: " + e.message;
   } finally {
     await client.end();
   }
@@ -107,6 +148,8 @@ async function DatabaseAuth(userId, database) {
 app.get("/me", authenticateJWT, (req, res) => {
   res.json({ userName: req.user.userName });
 });
+
+// AUTENTICAÇÃO
 app.post("/register", async (req, res) => {
   //console.log("Req: "+JSON.stringify(req.body))
   try {
@@ -146,6 +189,7 @@ app.post("/register", async (req, res) => {
     await client.end();
   }
 });
+
 app.post("/login", async (req, res) => {
   try {
     const { user, password } = req.body;
@@ -225,138 +269,117 @@ app.get("/user_databases", authenticateJWT, async (req, res) => {
       .send("Erro inesperado em get users_databases: " + e.message);
   }
 });
+// Chats e contatos
+app.post("/chat/findChats", authenticateJWT, async (request, response) => {
+  try {
+    let instance = request.query.instance;
+    console.log("Instance: " + instance);
+    const WPP_API_URL = process.env.WPP_API_URL;
+    const url = `${WPP_API_URL}/chat/findChats/${instance}`;
+    console.log(url);
+    const config = {
+      headers: {
+        timeout: 300,
+        apiKey: `${process.env.WPP_GLOBAL_KEY}`,
+        "Content-Type": "application/json",
+      },
+    };
 
-app.get("/messagesDB", authenticateJWT, async (request, response) => {
-  try {
-    let database = request.query.database;
-    let userId = request.user.userId;
-    let databases = await GetUserDatabase(userId);
-    let dbCount = databases.filter((a) => a.database_id == database);
-    //console.log("databases: "+JSON.stringify(databases))
-    //console.log("dbCount: "+JSON.stringify(dbCount))
-    let messages = [];
-    if (dbCount.length == 1) {
-      let client = await getConnection();
-      messages = await client.query(
-        `SELECT * FROM "EC-${database}".mensagens;`
-      );
-      client.end();
-    } else {
-      response.status(401).send("Usuario não autorizado neste banco de dados");
-    }
-    if (messages.rows.length > 0) {
-      response.status(200).send(messages.rows);
-    } else {
-      response.status(204).send("Nenhuma mensagem encontrada");
-    }
+    axios
+      .post(url, {}, config)
+      .then((res) => {
+        response.status(200).send(res.data);
+      })
+      .catch((error) => {
+        console.error("Erro ao buscar chats:" + error);
+        response.status(500).send("Erro ao buscar chats");
+        return;
+      });
   } catch (e) {
-    response
-      .status(404)
-      .send("Erro inesperado em get messagesDB: " + e.message);
-  }
-});
-app.get("/contacts", authenticateJWT, async (request, response) => {
-  let client;
-  try {
-    let database = request.query.database;
-    let userId = request.user.userId;
-    let contacts = [];
-    client = await getConnection();
-    let IsUserAuthorized = await DatabaseAuth(userId, database);
-    console.log("authorized: " + IsUserAuthorized);
-    if (IsUserAuthorized) {
-      contacts = await client.query(`SELECT * FROM "EC-${database}".contatos;`);
-    } else {
-      response.status(401).send("Usuario não autorizado nesse banco de dados.");
-    }
-    if (contacts.length === 0) {
-      await client.end();
-      response.status(204).send("Nenhum contato encontrado.");
-      return;
-    }
-    await client.end();
-    response.status(200).send(contacts.rows);
-  } catch (e) {
-    res.status(404).send("Erro inesperado em get contacts: " + e.message);
-  } finally {
-    await client.end();
+    response.status(404).send("Erro inesperado em get chats: " + e.message);
   }
 });
 
-app.get("/messagesDB/:contact", authenticateJWT, async (request, response) => {
+app.post("/chat/findContacts", authenticateJWT, async (request, response) => {
   try {
-    const { contact } = request.params;
-    let database = request.query.database;
-    let userId = request.user.userId;
-    let messages = [];
-    let client = await getConnection();
-    let IsUserAuthorized = await DatabaseAuth(userId, database);
-    console.log("authorized: " + IsUserAuthorized);
+    let instance = request.query.instance;
+    //console.log("Instance: " + instance);
+    const WPP_API_URL = process.env.WPP_API_URL;
+    const url = `${WPP_API_URL}/chat/findContacts/${instance}`;
+    //console.log(url);
+    const config = {
+      headers: {
+        apiKey: `${process.env.WPP_GLOBAL_KEY}`,
+        "Content-Type": "application/json",
+      },
+    };
 
-    if (IsUserAuthorized) {
-      messages = await client.query(
-        `SELECT * FROM "EC-${database}".mensagens WHERE recipient = '${contact}' OR sender = '${contact}';`
-      );
-    } else {
-      response.status(401).send("Usuario não autorizado nesse banco de dados.");
-    }
-    if (messages.rows.length === 0) {
-      response
-        .status(404)
-        .send("Nenhuma mensagem encontrada para este número ou perfil.");
-      return;
-    }
-    response.status(200).send(messages);
+    axios
+      .post(url, {}, config)
+      .then((res) => {
+        response.status(200).send(res.data);
+      })
+      .catch((error) => {
+        console.error("Erro ao buscar chats:" + error);
+        response.status(500).send("Erro ao buscar contatos");
+        return;
+      });
   } catch (e) {
-    return "Erro ao buscar mensagens por contato: " + e.message;
-  } finally {
-    await client.end();
+    response.status(404).send("Erro inesperado em get contatos: " + e.message);
   }
 });
 
-app.post("/LogIncomingMessage", async (request, response) => {
+//Fetch messages da api
+app.post("/chat/findMessages", authenticateJWT, async (request, response) => {
   try {
-    const message = request.body;
-    let formatedMessage = {};
-    if (message.entry[0]) {
-      formatedMessage = {
-        id: message.entry[0].changes[0].value.messages[0].id,
-        recipient: process.env.WPP_MY_NUMBER,
-        sender: message.entry[0].changes[0].value.messages[0].from,
-        mode: "received",
-        type: message.entry[0].changes[0].value.messages[0].type,
-        text: message.entry[0].changes[0].value.messages[0].text.body,
-        arquivo_url: "",
-        timestamp: message.entry[0].changes[0].value.messages[0].timestamp,
-        metadados: JSON.stringify(message.entry[0].changes[0].value.metadata),
-        source: message.entry[0].changes[0].value.messaging_product,
-      };
-    }
+    let instance = request.query.instance;
+    const { number } = request.body;
+    const WPP_API_URL = process.env.WPP_API_URL;
+    const url = `${WPP_API_URL}/chat/findMessages/${instance}`;
+    const config = {
+      headers: {
+        apiKey: `${process.env.WPP_GLOBAL_KEY}`,
+        "Content-Type": "application/json",
+      },
+    };
+    const body = {
+      where: {
+        key: {
+          remoteJid: `${number}`,
+        },
+      },
+      // optional
+      page: 1,
+      offset: 10,
+    };
 
-    console.log("Formated Message:", formatedMessage);
-    let res = await InsertMessage(formatedMessage);
-    io.emit("new_message", formatedMessage);
-    if (!res) {
-      response.status(404).send("Mensagem não encontrada");
-    } else {
-      response.status(200).send("Mensagem recebida e registrada com sucesso");
-    }
+    axios
+      .post(url, body, config)
+      .then((res) => {
+        response.status(200).send(res.data);
+      })
+      .catch((error) => {
+        console.error("Erro ao buscar chats:" + error);
+        response.status(500).send("Erro ao buscar contatos");
+        return;
+      });
   } catch (e) {
-    res
-      .status(404)
-      .send("Erro inesperado em log incoming messages: " + e.message);
+    response.status(404).send("Erro inesperado em get contatos: " + e.message);
   }
 });
 
-app.post("/message", authenticateJWT, async (request, response) => {
-  const url = `https://graph.facebook.com/${process.env.WPP_VERSION}/${process.env.WPP_MY_NUMBER_ID}/messages`;
-
+//Enviar mensagem de texto via API WPP
+app.post("/sendText", authenticateJWT, async (request, response) => {
   const data = request.body;
-  console.log(data);
+  const { instance } = request.query;
+  const WPP_API_URL = process.env.WPP_API_URL;
+  const url = `${WPP_API_URL}/message/sendText/${instance}`;
+  console.log("instance:" + instance);
+  console.log("Data: " + JSON.stringify(data));
 
   const config = {
     headers: {
-      Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+      apiKey: `${process.env.WPP_GLOBAL_KEY}`,
       "Content-Type": "application/json",
     },
   };
@@ -364,33 +387,21 @@ app.post("/message", authenticateJWT, async (request, response) => {
   axios
     .post(url, data, config)
     .then(async (res) => {
-      let mode = "sent";
-      let formatedMessage = {};
-      try {
-        formatedMessage = {
-          id: res.data.messages[0].id,
-          recipient: data.to,
-          sender: process.env.WPP_MY_NUMBER,
-          mode: mode,
-          type: data.type,
-          text: data.text.body,
-          arquivo_url: "",
-          timestamp: Date.now(),
-          metadados: "",
-          source: res.data.messaging_product,
-        };
-        InsertMessage(formatedMessage);
-      } catch (error) {
-        console.error("Erro no log de informações:", error);
-        response.status(500).send("Erro no log de informações");
+      console.log("Resposta da API WPP: " + res.status);
+      if (res.status !== 201) {
+        console.error("Erro ao enviar mensagem:");
+        response.status(500).send("Erro ao enviar mensagem");
         return;
+      } else {
+        console.log("Mensagem enviada com sucesso:", res.data);
+        response.status(200).send("Mensagem enviada com sucesso");
       }
-      response.send(formatedMessage);
     })
     .catch((error) => {
       console.error(
         "Erro ao enviar mensagem:",
         error.res ? error.res.data : error.message
       );
+      response.status(500).send("Erro ao enviar mensagem");
     });
 });
