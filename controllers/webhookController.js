@@ -1,35 +1,14 @@
+import axios from "axios";
+import { io } from "../api/socket.js";
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 // WHATSAPP TOKEN ERA GRAPH_API_TOKEN;
 const { WEBHOOK_VERIFY_TOKEN, WHATSAPP_TOKEN } = process.env;
-import axios from "axios";
-
-/*
-export const webhookGet = async (req, res) => {
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
-
-  // check the mode and token sent are correct
-  if (mode === "subscribe" && token === WEBHOOK_VERIFY_TOKEN) {
-    // respond with 200 OK and challenge token from the request
-    res.status(200).send(challenge);
-    console.log("Webhook verified successfully!");
-  } else {
-    // respond with '403 Forbidden' if verify tokens do not match
-    res.sendStatus(403);
-  }
-};*/
-export const webhookPostTelegram = async (req, res) => {
-  // log incoming messages
-  console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
-  res.sendStatus(200);
-};
 
 export const webhookPost = async (req, res) => {
   const payload = req.body;
 
   // 1. Logar o Payload da Evolution
-  console.log("Incoming Evolution webhook:", JSON.stringify(payload, null, 2));
+  //console.log("Incoming Evolution webhook:", JSON.stringify(payload, null, 2));
 
   // 2. Verificar se o evento é uma nova mensagem
   // O evento 'messages.upsert' geralmente indica uma nova mensagem recebida/enviada
@@ -91,5 +70,6 @@ export const webhookPost = async (req, res) => {
   }
 
   // 5. SEMPRE responda com 200 OK para o Evolution
+  io.emit("new_message", payload);
   res.sendStatus(200);
 };
