@@ -35,7 +35,7 @@ async function InsertMessage(formatedMessage, database) {
   let client;
   let res;
   try {
-    client = await getConnection();
+    client = await getConnection(process.env.DB_DATABASE);
     let coluna;
     switch (formatedMessage.source) {
       case "whatsapp":
@@ -117,7 +117,7 @@ async function GetUserDatabase(userId) {
   //console.log("Userid: "+userId)
   let client;
   try {
-    client = await getConnection();
+    client = await getConnection(process.env.DB_DATABASE);
     const response = await client.query(`SELECT 
           ud.database_id,
           d.name
@@ -154,7 +154,7 @@ app.post("/register", async (req, res) => {
   //console.log("Req: "+JSON.stringify(req.body))
   try {
     const { user, password } = req.body;
-    const client = await getConnection();
+    const client = await getConnection(process.env.DB_DATABASE);
     const find = await client.query(
       `SELECT * FROM "${MANAGEMENT_SCHEMA}".users WHERE username = '${user}'`
     );
@@ -194,7 +194,7 @@ app.post("/login", async (req, res) => {
   try {
     const { user, password } = req.body;
     console.log(req.body);
-    let client = await getConnection();
+    let client = await getConnection(process.env.DB_DATABASE);
     //console.log("User: " + user);
     let response = await client.query(
       `SELECT * FROM "${MANAGEMENT_SCHEMA}".users WHERE username = '${user}' AND password = '${password}';`
@@ -269,7 +269,28 @@ app.get("/user_databases", authenticateJWT, async (req, res) => {
       .send("Erro inesperado em get users_databases: " + e.message);
   }
 });
-// Chats e contatos
+// Contatos
+app.put(
+  "/contact/updateContact",
+  authenticateJWT,
+  async (request, response) => {
+    try {
+      let client = await getConnection(process.env.EVOLUTION_DB_DATABASE);
+      let contact = request.body;
+      console.log("Contact to update: " + JSON.stringify(contact));
+      const res = await client.query(
+        `UPDATE public."Contact" SET "pushName"='${contact.pushName}', "updatedAt"=CURRENT_TIMESTAMP
+        WHERE "remoteJid"='${contact.remoteJid}' AND "instanceId"='${contact.instanceId}'`
+      );
+      response.status(200).send("Contato: " + JSON.stringify(contact));
+    } catch (e) {
+      response
+        .status(404)
+        .send("Erro inesperado em update contact: " + e.message);
+    }
+  }
+);
+// Chats
 app.post("/chat/findChats", authenticateJWT, async (request, response) => {
   try {
     let instance = request.query.instance;
@@ -333,7 +354,7 @@ app.post("/chat/findContacts", authenticateJWT, async (request, response) => {
 app.post("/chat/findMessages", authenticateJWT, async (request, response) => {
   try {
     let instance = request.query.instance;
-    const { number } = request.body;
+    const { remoteJid } = request.body;
     const WPP_API_URL = process.env.WPP_API_URL;
     const url = `${WPP_API_URL}/chat/findMessages/${instance}`;
     const config = {
@@ -345,7 +366,7 @@ app.post("/chat/findMessages", authenticateJWT, async (request, response) => {
     const body = {
       where: {
         key: {
-          remoteJid: `${number}`,
+          remoteJid: `${remoteJid}`,
         },
       },
       // optional
