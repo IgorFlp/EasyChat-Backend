@@ -89,11 +89,7 @@ async function InsertMessage(formatedMessage, database) {
   }
 }
 app.use("/webhook", router);
-/*
-app.listen(PORT, "0.0.0.0", async () => {
-  console.log("Server Listening on PORT:", PORT);
-  console.log("WhatsApp Number ID:", WPP_MY_NUMBER_ID);
-});*/
+
 io.on("connection", (socket) => {
   console.log("Socket conectado (do server.js também):", socket.id);
 });
@@ -104,17 +100,15 @@ httpServer.listen(PORT, "0.0.0.0", () => {
 // AUTH METHODS
 function authenticateJWT(req, res, next) {
   const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
-  //console.log("Token: "+token);
+
   if (!token) return res.sendStatus(401);
   jwt.verify(token, AUTH_SECRET, (err, user) => {
     if (err) return res.sendStatus(403);
-    //console.log("JWT user: "+JSON.stringify(user));
     req.user = user;
     next();
   });
 }
 async function GetUserDatabase(userId) {
-  //console.log("Userid: "+userId)
   let client;
   try {
     client = await getConnection(process.env.DB_DATABASE);
@@ -151,14 +145,13 @@ app.get("/me", authenticateJWT, (req, res) => {
 
 // AUTENTICAÇÃO
 app.post("/register", async (req, res) => {
-  //console.log("Req: "+JSON.stringify(req.body))
   try {
     const { user, password } = req.body;
     const client = await getConnection(process.env.DB_DATABASE);
     const find = await client.query(
       `SELECT * FROM "${MANAGEMENT_SCHEMA}".users WHERE username = '${user}'`
     );
-    console.log("find rows: " + find.rows);
+
     if (find.rows.length > 0) {
       client.end();
       res
@@ -174,8 +167,7 @@ app.post("/register", async (req, res) => {
       const response = await client.query(
         `INSERT INTO "${MANAGEMENT_SCHEMA}".users (username,password) VALUES ('${newUser.username}', '${newUser.password}') RETURNING id;`
       );
-      console.log("response: " + response.rows[0].id);
-      //const userId = response.insertedId;
+
       client.end();
       if (response.rows[0].id) {
         res.status(200).json({ message: "Usuario criado" });
@@ -193,9 +185,9 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
   try {
     const { user, password } = req.body;
-    console.log(req.body);
+
     let client = await getConnection(process.env.DB_DATABASE);
-    //console.log("User: " + user);
+
     let response = await client.query(
       `SELECT * FROM "${MANAGEMENT_SCHEMA}".users WHERE username = '${user}' AND password = '${password}';`
     );
@@ -204,18 +196,50 @@ app.post("/login", async (req, res) => {
       response.status(404).send("Usuario ou senha incorreto..");
       return;
     }
-    console.log(response.rows);
+    let instances = [];
+    let instancesIds = [];
     if (response.rows.length > 0) {
       const userId = response.rows[0].id;
       const userName = response.rows[0].username;
+      console.log("UserId: " + userId + " UserName: " + userName);
+      let client2 = await getConnection(process.env.DB_DATABASE);
+
+      let response2 = await client2.query(
+        `SELECT * FROM "${MANAGEMENT_SCHEMA}".users_instances WHERE user_id = '${userId}';`
+      );
+      client2.end();
+
+      if (response2.rows.length === 0) {
+        res.status(404).send("Nenhuma instancia para esse usuario..");
+        return;
+      } else {
+        response2.rows.filter((inst) => {
+          instancesIds.push(inst.instance_id);
+        });
+        let client3 = await getConnection(process.env.EVOLUTION_DB_DATABASE);
+        console.log("Instances Ids: " + JSON.stringify(instancesIds));
+        let response3 = await client3.query(
+          `SELECT * FROM public."Instance" WHERE "id" = ANY($1::text[])`,
+          [instancesIds]
+        );
+        //console.log("Instances data: " + JSON.stringify(response3.rows));
+        client3.end();
+        if (response3.rows.length === 0) {
+          res.status(404).send("Nenhuma instancia para esse usuario..");
+          return;
+        } else {
+          response3.rows.filter((inst) => {
+            instances.push(inst.name);
+          });
+        }
+      }
       const token = jwt.sign(
-        { userId: userId, userName: userName },
+        { userId: userId, userName: userName, instances: instances },
         AUTH_SECRET,
         {
           expiresIn: "2h",
         }
       );
-
       res.cookie("token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -224,7 +248,7 @@ app.post("/login", async (req, res) => {
         path: "/",
         ...(process.env.NODE_ENV === "production" && { domain: COOKIE_DOMAIN }),
       });
-      res.json({ userName: userName });
+      res.json({ instances: instances });
     } else {
       res.status(401).send("Invalid credentials");
     }
@@ -392,10 +416,18 @@ app.post("/chat/findMessages", authenticateJWT, async (request, response) => {
 //Enviar mensagem de texto via API WPP
 app.post("/sendText", authenticateJWT, async (request, response) => {
   const data = request.body;
-  const { instance } = request.query;
+  console.log("query params: " + JSON.stringify(request.query));
+  console.log("user: " + JSON.stringify(request.user));
+  const requestedInstance = request.query.instance;
+
+  if (!request.user.instances.includes(requestedInstance)) {
+    return response
+      .status(403)
+      .json({ error: "Você não tem permissão para esta instância" });
+  }
   const WPP_API_URL = process.env.WPP_API_URL;
-  const url = `${WPP_API_URL}/message/sendText/${instance}`;
-  console.log("instance:" + instance);
+  const url = `${WPP_API_URL}/message/sendText/${requestedInstance}`;
+  console.log("instance:" + requestedInstance);
   console.log("Data: " + JSON.stringify(data));
 
   const config = {
