@@ -1,46 +1,36 @@
-import { DsqlSigner } from "@aws-sdk/dsql-signer";
-import postgres from "postgres";
-import assert from "node:assert";
+import { Client } from "pg";
 import "./loadEnv.js";
 
-const ADMIN = "admin";
-const PUBLIC = "public";
-const SCHEMA = "EasyChat";
-
-export async function getConnection() {
-  
-  const clusterEndpoint = process.env.CLUSTER_ENDPOINT;
-  assert(clusterEndpoint);
-  const user = process.env.CLUSTER_USER;
-  assert(user);
-  const region = process.env.CLUSTER_REGION;
-  assert(region);
-
-  let client = postgres({
-    host: clusterEndpoint,
-    user: user,
-    password: async () => await getPasswordToken(clusterEndpoint, user, region),
-    database: "postgres",
-    port: 5432,
-    idle_timeout: 2,
+export async function getConnection(database) {
+  const client = new Client({
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: database,
     ssl: {
-      rejectUnauthorized: true,
+      rejectUnauthorized: false,
     },
-    // max: 1, // Optionally set maximum connection pool size
   });
+
+  client
+    .connect()
+    .then(() => console.log("Conectado com SSL!"))
+    .catch((e) => console.error(e));
 
   return client;
 }
-
-async function getPasswordToken(clusterEndpoint, user, region) {
-  const signer = new DsqlSigner({
-    hostname: clusterEndpoint,
-    region,
-  });
-  if (user === ADMIN) {
-    return await signer.getDbConnectAdminAuthToken();
-  } else {
-    signer.user = user;
-    return await signer.getDbConnectAuthToken();
+/*
+async function GetContato() {
+  let database = "10000";
+  let coluna = "whatsapp_id";
+  let common_id = "5518998200826";
+  let client = await getConnection();
+  const query1 = `SELECT * FROM "EC-${database}".contatos WHERE ${coluna} = '${common_id}'`;
+  let res = await client.query(query1);
+  if (res.rows.length > 0) {
+    console.log("Linha: " + JSON.stringify(res.rows[0].id));
   }
 }
+GetContato();
+*/
