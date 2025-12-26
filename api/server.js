@@ -3,7 +3,7 @@ import axios from "axios";
 import { httpServer, io, app } from "./socket.js";
 import { getConnection } from "../config/db.js";
 import "../config/loadEnv.js";
-import { authenticateJWT } from "../controllers/authController.js";
+import { authenticateJWT } from "../middlewares/authenticateJWT.js";
 import { webhookRouter } from "../routes/webhook.js";
 import cors from "cors";
 import jwt from "jsonwebtoken";
@@ -42,11 +42,6 @@ io.on("connection", (socket) => {
 
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log("Servidor com WebSocket rodando na porta:", PORT);
-});
-// AUTH METHODS
-
-app.get("/me", authenticateJWT, (req, res) => {
-  res.json({ userName: req.user.userName });
 });
 
 // AUTENTICAÇÃO

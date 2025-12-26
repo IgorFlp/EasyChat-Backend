@@ -8,16 +8,7 @@ import { listUserInstances } from "../services/managementService.js";
 import { getInstancesByIds } from "../services/evolutionService.js";
 
 const AUTH_SECRET = process.env.AUTH_SECRET;
-export function authenticateJWT(req, res, next) {
-  const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
 
-  if (!token) return res.sendStatus(401);
-  jwt.verify(token, AUTH_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-}
 export async function DatabaseAuth(userId, database) {
   let databases = await GetUserDatabase(userId);
   let dbCount = databases.filter((a) => a.database_id == database);
@@ -28,6 +19,11 @@ export async function DatabaseAuth(userId, database) {
     return false;
   }
 }
+// AUTH METHODS
+export function me(req, res) {
+  res.json({ userName: req.user.userName });
+}
+
 export async function register(req, res) {
   try {
     const { user, password } = req.body;
@@ -99,6 +95,7 @@ export async function login(req, res) {
           expiresIn: "2h",
         }
       );
+
       res.cookie("token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
