@@ -10,6 +10,8 @@ import jwt from "jsonwebtoken";
 import { createRequire } from "module";
 import e from "express";
 import { authRouter } from "../routes/authRoutes.js";
+import { contactRouter } from "../routes/contactRoutes.js";
+import { chatRouter } from "../routes/chatRoutes.js";
 
 const require = createRequire(import.meta.url);
 const cookieParser = require("cookie-parser");
@@ -35,6 +37,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use("/webhook", webhookRouter);
 app.use("/auth", authRouter);
+app.use("/chat", chatRouter);
+app.use("/contact", contactRouter);
 
 io.on("connection", (socket) => {
   console.log("Socket conectado (do server.js também):", socket.id);
@@ -53,22 +57,7 @@ app.get("/status", (request, response) => {
   };
   response.send(status);
 });
-app.get("/user_databases", authenticateJWT, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    let databases = await GetUserDatabase(userId);
-    console.log(databases);
-    if (databases.length > 0) {
-      res.status(200).send(databases);
-    } else {
-      res.status(404).send("Nenhum banco de dados para este usuario.");
-    }
-  } catch (e) {
-    res
-      .status(404)
-      .send("Erro inesperado em get users_databases: " + e.message);
-  }
-});
+
 // Contatos
 app.put(
   "/contact/updateContact",
@@ -90,65 +79,6 @@ app.put(
     }
   }
 );
-// Chats
-app.post("/chat/findChats", authenticateJWT, async (request, response) => {
-  try {
-    let instance = request.query.instance;
-    console.log("Instance: " + instance);
-    const WPP_API_URL = process.env.WPP_API_URL;
-    const url = `${WPP_API_URL}/chat/findChats/${instance}`;
-    console.log(url);
-    const config = {
-      headers: {
-        timeout: 300,
-        apiKey: `${process.env.WPP_GLOBAL_KEY}`,
-        "Content-Type": "application/json",
-      },
-    };
-
-    axios
-      .post(url, {}, config)
-      .then((res) => {
-        response.status(200).send(res.data);
-      })
-      .catch((error) => {
-        console.error("Erro ao buscar chats:" + error);
-        response.status(500).send("Erro ao buscar chats");
-        return;
-      });
-  } catch (e) {
-    response.status(404).send("Erro inesperado em get chats: " + e.message);
-  }
-});
-
-app.post("/chat/findContacts", authenticateJWT, async (request, response) => {
-  try {
-    let instance = request.query.instance;
-    //console.log("Instance: " + instance);
-    const WPP_API_URL = process.env.WPP_API_URL;
-    const url = `${WPP_API_URL}/chat/findContacts/${instance}`;
-    //console.log(url);
-    const config = {
-      headers: {
-        apiKey: `${process.env.WPP_GLOBAL_KEY}`,
-        "Content-Type": "application/json",
-      },
-    };
-
-    axios
-      .post(url, {}, config)
-      .then((res) => {
-        response.status(200).send(res.data);
-      })
-      .catch((error) => {
-        console.error("Erro ao buscar chats:" + error);
-        response.status(500).send("Erro ao buscar contatos");
-        return;
-      });
-  } catch (e) {
-    response.status(404).send("Erro inesperado em get contatos: " + e.message);
-  }
-});
 
 //Fetch messages da api
 app.post("/chat/findMessages", authenticateJWT, async (request, response) => {
