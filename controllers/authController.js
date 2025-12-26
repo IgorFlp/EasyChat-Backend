@@ -4,7 +4,10 @@ import {
   createUser,
   loginUser,
 } from "../services/authService.js";
-import { listUserInstances } from "../services/managementService.js";
+import {
+  listUserInstances,
+  GetUserDatabase,
+} from "../services/managementService.js";
 import { getInstancesByIds } from "../services/evolutionService.js";
 
 const AUTH_SECRET = process.env.AUTH_SECRET;
@@ -124,4 +127,21 @@ export async function logout(req, res) {
   });
 
   res.status(200).json({ message: "Logout realizado com sucesso" });
+}
+
+export async function user_databases(req, res) {
+  try {
+    const userId = req.user.userId;
+    let databases = await GetUserDatabase(userId);
+
+    if (databases.length > 0) {
+      res.status(200).send(databases);
+    } else {
+      res.status(404).send("Nenhum banco de dados para este usuario.");
+    }
+  } catch (e) {
+    res
+      .status(404)
+      .send("Erro inesperado em get users_databases: " + e.message);
+  }
 }
