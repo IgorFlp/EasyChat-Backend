@@ -2,6 +2,6 @@ import express from "express";
 
 import { webhookPost } from "../controllers/webhookController.js";
 
-export const router = express.Router();
+export const webhookRouter = express.Router();
 
-router.post("/", webhookPost);
+webhookRouter.post("/", webhookPost);

@@ -2,15 +2,15 @@
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import "./loadEnv.js";
+import "../config/loadEnv.js";
 
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.CORS_ORIGIN,
-    methods: ['GET', 'POST'],
-    credentials: true,    
+    methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
