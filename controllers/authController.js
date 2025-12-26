@@ -8,7 +8,7 @@ import {
   listUserInstances,
   GetUserDatabase,
 } from "../services/managementService.js";
-import { getInstancesByIds } from "../services/evolutionService.js";
+import { getInstancesByIds } from "../services/evolution/evolutionClient.js";
 
 const AUTH_SECRET = process.env.AUTH_SECRET;
 

@@ -1,29 +1,25 @@
 import express from "express";
 import axios from "axios";
 import { httpServer, io, app } from "./socket.js";
-import { getConnection } from "../config/db.js";
 import "../config/loadEnv.js";
 import { authenticateJWT } from "../middlewares/authenticateJWT.js";
 import { webhookRouter } from "../routes/webhook.js";
 import cors from "cors";
-import jwt from "jsonwebtoken";
 import { createRequire } from "module";
-import e from "express";
 import { authRouter } from "../routes/authRoutes.js";
 import { contactRouter } from "../routes/contactRoutes.js";
 import { chatRouter } from "../routes/chatRoutes.js";
 
 const require = createRequire(import.meta.url);
 const cookieParser = require("cookie-parser");
-const allowedDomain = process.env.CORS_ORIGIN; //.replace(/^https?:\/\//, "");
+const allowedDomain = process.env.CORS_ORIGIN;
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN;
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
-//const app = express();
 
 const MANAGEMENT_SCHEMA = "EasyChat";
 const WPP_MY_NUMBER_ID = process.env.WPP_MY_NUMBER_ID;
-//const app = express();
+
 app.use(cookieParser());
 app.use(express.json());
 app.use(
@@ -58,29 +54,6 @@ app.get("/status", (request, response) => {
   response.send(status);
 });
 
-// Contatos
-app.put(
-  "/contact/updateContact",
-  authenticateJWT,
-  async (request, response) => {
-    try {
-      let client = await getConnection(process.env.EVOLUTION_DB_DATABASE);
-      let contact = request.body;
-      console.log("Contact to update: " + JSON.stringify(contact));
-      const res = await client.query(
-        `UPDATE public."Contact" SET "pushName"='${contact.pushName}', "updatedAt"=CURRENT_TIMESTAMP
-        WHERE "remoteJid"='${contact.remoteJid}' AND "instanceId"='${contact.instanceId}'`
-      );
-      response.status(200).send("Contato: " + JSON.stringify(contact));
-    } catch (e) {
-      response
-        .status(404)
-        .send("Erro inesperado em update contact: " + e.message);
-    }
-  }
-);
-
-//Fetch messages da api
 app.post("/chat/findMessages", authenticateJWT, async (request, response) => {
   try {
     let instance = request.query.instance;
