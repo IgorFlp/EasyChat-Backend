@@ -1,0 +1,26 @@
+name: Build & Deploy Easychat API
+
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login GHCR
+        run: echo "${{ secrets.GHCR_SECRET }}" | docker login ghcr.io -u igorflp --password-stdin
+
+      - name: Build Docker image
+        run: |
+          docker build -t ghcr.io/igorflpdev/easychat-backend:latest .
+
+      - name: Push image
+        run: |
+          docker push ghcr.io/igorflpdev/easychat-backend:latest
+
+  
