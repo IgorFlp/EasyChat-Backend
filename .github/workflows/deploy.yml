@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Login GHCR
-        run: echo "${{ secrets.GHRC_SECRET }}" | docker login ghcr.io -u igorflp --password-stdin
+        run: echo "${{ secrets.GHCR_SECRET }}" | docker login ghcr.io -u igorflp --password-stdin
 
       - name: Build Docker image
         run: |
