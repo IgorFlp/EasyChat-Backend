@@ -3,7 +3,7 @@ name: Build & Push Easychat API (STAGING)
 on:
   push:
     branches:
-      - "feature/**"
+      - "feature"
 
 permissions:
   contents: read
