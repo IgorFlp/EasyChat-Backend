@@ -17,10 +17,10 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ghcr.io/igorflpdev/easychat-backend:latest .
+          docker build -t ghcr.io/igorflp/easychat-backend:latest .
 
       - name: Push image
         run: |
-          docker push ghcr.io/igorflpdev/easychat-backend:latest
+          docker push ghcr.io/igorflp/easychat-backend:latest
 
   
