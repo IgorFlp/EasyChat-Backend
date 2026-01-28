@@ -11,6 +11,7 @@ import {
 import { getInstancesByIds } from "../services/evolution/evolutionClient.js";
 
 const AUTH_SECRET = process.env.AUTH_SECRET;
+const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
 
 export async function DatabaseAuth(userId, database) {
   let databases = await GetUserDatabase(userId);
