@@ -41,7 +41,7 @@ io.on("connection", (socket) => {
 });
 
 httpServer.listen(PORT, "0.0.0.0", () => {
-  console.log("Servidor com WebSocket rodando na porta:", PORT);
+  console.log("-- Servidor com WebSocket rodando na porta:", PORT);
 });
 
 // AUTENTICAÇÃO
